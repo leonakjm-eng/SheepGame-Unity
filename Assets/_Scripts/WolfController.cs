@@ -12,11 +12,15 @@ public class WolfController : MonoBehaviour, IAgent
     private Vector3 _direction;
     private bool _isPanic = false;
     private float _currentSpeed;
+    private Animator _animator;
 
     private void Start()
     {
         _currentSpeed = moveSpeed;
         _direction = Vector3.forward; // Default
+
+        // Requirement 3: Cache Animator
+        _animator = GetComponentInChildren<Animator>();
     }
 
     private void Update()
@@ -32,6 +36,13 @@ public class WolfController : MonoBehaviour, IAgent
         if (_direction != Vector3.zero)
         {
             transform.rotation = Quaternion.LookRotation(_direction);
+        }
+
+        // Requirement 3: Animation
+        if (_animator != null)
+        {
+            _animator.SetFloat("Vert", _currentSpeed);
+            _animator.SetInteger("State", _currentSpeed > 0.1f ? 1 : 0);
         }
     }
 
