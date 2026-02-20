@@ -145,15 +145,33 @@ public class GameManager : MonoBehaviour
         float padding = 3f;
         float x = Random.Range(_mapMin.x + padding, _mapMax.x - padding);
         float z = Random.Range(_mapMin.y + padding, _mapMax.y - padding);
-        Instantiate(targetZonePrefab, new Vector3(x, 0, z), Quaternion.identity);
+
+        // Requirement 1: Y = 0.5f, Scale * 2
+        GameObject zone = Instantiate(targetZonePrefab, new Vector3(x, 0.5f, z), Quaternion.identity);
+        zone.transform.localScale = Vector3.one * 2f;
     }
 
     private void SpawnEntity(GameObject prefab)
     {
         float padding = 1f;
-        float x = Random.Range(_mapMin.x + padding, _mapMax.x - padding);
-        float z = Random.Range(_mapMin.y + padding, _mapMax.y - padding);
-        Instantiate(prefab, new Vector3(x, 0, z), Quaternion.identity);
+        Vector3 spawnPos = Vector3.zero;
+        int maxAttempts = 30;
+        float checkRadius = 1.0f; // Adjust based on agent size
+
+        // Requirement 2: Safe spawn logic with max attempts
+        for (int i = 0; i < maxAttempts; i++)
+        {
+            float x = Random.Range(_mapMin.x + padding, _mapMax.x - padding);
+            float z = Random.Range(_mapMin.y + padding, _mapMax.y - padding);
+            spawnPos = new Vector3(x, 0, z);
+
+            if (!Physics.CheckSphere(spawnPos, checkRadius, agentLayer))
+            {
+                break; // Found valid spot
+            }
+        }
+
+        Instantiate(prefab, spawnPos, Quaternion.identity);
     }
 
     private void Update()

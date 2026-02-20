@@ -13,6 +13,7 @@ public class SheepController : MonoBehaviour, IAgent
     private float _currentSpeed;
     private Transform _targetZoneTransform;
     private float _targetZoneRadius;
+    private Animator _animator;
 
     public bool IsSafe => _isSafe;
 
@@ -21,6 +22,9 @@ public class SheepController : MonoBehaviour, IAgent
         _currentSpeed = moveSpeed;
         Vector2 rnd = Random.insideUnitCircle;
         _direction = new Vector3(rnd.x, 0, rnd.y).normalized;
+
+        // Requirement 3: Cache Animator
+        _animator = GetComponentInChildren<Animator>();
     }
 
     private void Update()
@@ -41,6 +45,14 @@ public class SheepController : MonoBehaviour, IAgent
         if (_direction != Vector3.zero)
         {
             transform.rotation = Quaternion.LookRotation(_direction);
+        }
+
+        // Requirement 3: Update Animation
+        if (_animator != null)
+        {
+            _animator.SetFloat("Vert", _currentSpeed);
+            // Assuming State 1 is Move, 0 is Idle.
+            _animator.SetInteger("State", _currentSpeed > 0.1f ? 1 : 0);
         }
     }
 
