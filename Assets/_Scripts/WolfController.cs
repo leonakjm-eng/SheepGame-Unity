@@ -12,12 +12,14 @@ public class WolfController : MonoBehaviour, IAgent
     private float _currentSpeed;
     private Animator _animator;
     private Rigidbody _rigidbody;
+    private float _wanderTimer;
 
     private void Start()
     {
         _currentSpeed = moveSpeed;
         Vector2 rnd = Random.insideUnitCircle;
         _direction = new Vector3(rnd.x, 0, rnd.y).normalized;
+        _wanderTimer = Random.Range(1.0f, 2.0f);
 
         _animator = GetComponentInChildren<Animator>();
         _rigidbody = GetComponent<Rigidbody>();
@@ -26,6 +28,18 @@ public class WolfController : MonoBehaviour, IAgent
 
     private void Update()
     {
+        // Wandering Logic
+        if (!_isPanic)
+        {
+            _wanderTimer -= Time.deltaTime;
+            if (_wanderTimer <= 0)
+            {
+                Vector2 rnd = Random.insideUnitCircle;
+                _direction = new Vector3(rnd.x, 0, rnd.y).normalized;
+                _wanderTimer = Random.Range(1.0f, 2.0f);
+            }
+        }
+
         // Constraint: Update animation based on speed
         if (_animator != null)
         {
