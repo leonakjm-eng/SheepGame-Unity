@@ -48,7 +48,7 @@ public class SheepController : MonoBehaviour, IAgent
             if (dist > _targetZoneRadius)
             {
                 Vector3 toCenter = (_targetZoneTransform.position - _rigidbody.position).normalized;
-                _direction = Vector3.Lerp(_direction, toCenter, Time.fixedDeltaTime * 5f);
+                _direction = Vector3.Lerp(_direction, toCenter, Time.fixedDeltaTime * 5f).normalized;
             }
         }
 
@@ -79,7 +79,8 @@ public class SheepController : MonoBehaviour, IAgent
     {
         if (other.gameObject.layer == LayerMask.NameToLayer("Zone"))
         {
-            _isSafe = true;
+            // Do not set _isSafe = true here. TargetZone script handles the counting and sets it.
+            // Just cache the transform/radius.
             _targetZoneTransform = other.transform;
             SphereCollider sc = other.GetComponent<SphereCollider>();
             if (sc != null)
