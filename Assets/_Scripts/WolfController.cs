@@ -72,8 +72,13 @@ public class WolfController : MonoBehaviour, IAgent
     {
         if (collision.gameObject.CompareTag("Sheep"))
         {
-            Destroy(collision.gameObject);
-            GameManager.Instance.AddDeathCount();
+            SheepController sheep = collision.gameObject.GetComponent<SheepController>();
+
+            if (sheep != null && !sheep.IsSafe)
+            {
+                Destroy(collision.gameObject);
+                GameManager.Instance.AddDeathCount();
+            }
         }
         else if (collision.gameObject.CompareTag("Wall"))
         {
