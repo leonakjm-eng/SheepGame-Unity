@@ -62,8 +62,9 @@ public class WolfController : MonoBehaviour, IAgent
 
         if (_direction != Vector3.zero)
         {
-            Quaternion targetRotation = Quaternion.LookRotation(_direction);
-            _rigidbody.MoveRotation(targetRotation);
+            Vector3 lookDir = new Vector3(_direction.x, 0, _direction.z).normalized;
+            Quaternion targetRotation = Quaternion.LookRotation(lookDir);
+            _rigidbody.MoveRotation(Quaternion.Slerp(_rigidbody.rotation, targetRotation, Time.fixedDeltaTime * 10f));
         }
     }
 

@@ -17,6 +17,9 @@ public class GameManager : MonoBehaviour
     public GameObject sheepPrefab;
     public GameObject wolfPrefab;
     public GameObject targetZonePrefab;
+    public GameObject treePrefab;
+    public GameObject rockPrefab;
+    public Transform obstaclesParent;
     public LayerMask agentLayer;
     public LayerMask groundLayer;
 
@@ -89,10 +92,22 @@ public class GameManager : MonoBehaviour
         foreach (var agent in FindObjectsOfType<WolfController>()) Destroy(agent.gameObject);
         foreach (var zone in FindObjectsOfType<TargetZone>()) Destroy(zone.gameObject);
 
+        // Clear previous obstacles
+        if (obstaclesParent != null)
+        {
+            foreach (Transform child in obstaclesParent)
+            {
+                Destroy(child.gameObject);
+            }
+        }
+
         // Step 1: TargetZone (Must be spawned first for safe agent placement)
         SpawnTargetZone();
 
-        // Step 2: Agents (Sheep & Wolf) Safe Spawn
+        // Step 2: Obstacles (Trees & Rocks)
+        SpawnObstacles();
+
+        // Step 3: Agents (Sheep & Wolf) Safe Spawn
         for (int i = 0; i < totalSheep; i++)
         {
             SpawnEntity(sheepPrefab);
@@ -143,6 +158,55 @@ public class GameManager : MonoBehaviour
         zone.transform.localScale = new Vector3(targetScaleXZ, 0.05f, targetScaleXZ);
     }
 
+    private void SpawnObstacles()
+    {
+        int treeCount = Random.Range(1, 3); // 1 or 2
+        int rockCount = 1;
+
+        // Check against Zone and Wall layers
+        int checkLayerMask = (1 << LayerMask.NameToLayer("Zone")) | (1 << LayerMask.NameToLayer("Wall"));
+
+        // Trees
+        for (int i = 0; i < treeCount; i++)
+        {
+            SpawnObstacle(treePrefab, checkLayerMask);
+        }
+
+        // Rock
+        for (int i = 0; i < rockCount; i++)
+        {
+            SpawnObstacle(rockPrefab, checkLayerMask);
+        }
+    }
+
+    private void SpawnObstacle(GameObject prefab, int layerMask)
+    {
+        float padding = 1f;
+        Vector3 spawnPos = Vector3.zero;
+        int maxAttempts = 30;
+        float checkRadius = 1.0f; // Obstacle size roughly
+        bool validPos = false;
+
+        for (int i = 0; i < maxAttempts; i++)
+        {
+            float x = Random.Range(_mapMin.x + padding, _mapMax.x - padding);
+            float z = Random.Range(_mapMin.y + padding, _mapMax.y - padding);
+            spawnPos = new Vector3(x, 0, z);
+
+            if (!Physics.CheckSphere(spawnPos, checkRadius, layerMask))
+            {
+                validPos = true;
+                break;
+            }
+        }
+
+        if (validPos)
+        {
+            GameObject obs = Instantiate(prefab, spawnPos, Quaternion.identity);
+            if (obstaclesParent != null) obs.transform.SetParent(obstaclesParent);
+        }
+    }
+
     private void SpawnEntity(GameObject prefab)
     {
         float padding = 1f;
@@ -151,8 +215,8 @@ public class GameManager : MonoBehaviour
         float checkRadius = 1.0f; // Adjust based on agent size
         bool validPos = false;
 
-        // Constraint: Check against Agent AND Zone layer
-        int combinedLayerMask = agentLayer | (1 << LayerMask.NameToLayer("Zone"));
+        // Constraint: Check against Agent, Zone, AND Wall layer (for obstacles)
+        int combinedLayerMask = agentLayer | (1 << LayerMask.NameToLayer("Zone")) | (1 << LayerMask.NameToLayer("Wall"));
 
         // Constraint: Safe spawn logic with max attempts
         for (int i = 0; i < maxAttempts; i++)
