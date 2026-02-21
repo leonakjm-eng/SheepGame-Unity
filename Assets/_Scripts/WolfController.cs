@@ -1,44 +1,31 @@
 using System.Collections;
-using System.Linq;
 using UnityEngine;
 
 public class WolfController : MonoBehaviour, IAgent
 {
     [Header("Settings")]
-    public float moveSpeed = 4f; // Faster than sheep
+    public float moveSpeed = 4f;
     public float panicDuration = 1f;
-    public float detectionRadius = 20f; // Limit search? FDS says "closest".
 
     private Vector3 _direction;
     private bool _isPanic = false;
     private float _currentSpeed;
     private Animator _animator;
+    private Rigidbody _rigidbody;
 
     private void Start()
     {
         _currentSpeed = moveSpeed;
-        _direction = Vector3.forward; // Default
+        Vector2 rnd = Random.insideUnitCircle;
+        _direction = new Vector3(rnd.x, 0, rnd.y).normalized;
 
-        // Requirement 3: Cache Animator
         _animator = GetComponentInChildren<Animator>();
+        _rigidbody = GetComponent<Rigidbody>();
     }
 
     private void Update()
     {
-        if (!_isPanic)
-        {
-            Hunt();
-            AvoidZone();
-        }
-
-        transform.Translate(_direction * _currentSpeed * Time.deltaTime, Space.World);
-
-        if (_direction != Vector3.zero)
-        {
-            transform.rotation = Quaternion.LookRotation(_direction);
-        }
-
-        // Requirement 3: Animation
+        // Constraint: Update animation based on speed
         if (_animator != null)
         {
             _animator.SetFloat("Vert", _currentSpeed);
@@ -46,57 +33,38 @@ public class WolfController : MonoBehaviour, IAgent
         }
     }
 
-    private void Hunt()
+    private void FixedUpdate()
     {
-        SheepController[] sheep = FindObjectsOfType<SheepController>();
-        // Filter out dead or safe? FDS: "Closest Sheep". Doesn't specify safe ones are immune.
-        // Assuming Safe sheep are still targets but protected by zone logic (Wolf avoids zone).
+        if (_rigidbody == null) return;
 
-        if (sheep.Length == 0) return;
-
-        SheepController nearest = null;
-        float minDst = float.MaxValue;
-
-        foreach (var s in sheep)
+        if (!_isPanic)
         {
-            float dst = Vector3.Distance(transform.position, s.transform.position);
-            if (dst < minDst)
-            {
-                minDst = dst;
-                nearest = s;
-            }
+            AvoidZone();
         }
 
-        if (nearest != null)
+        Vector3 nextPos = _rigidbody.position + (_direction * _currentSpeed * Time.fixedDeltaTime);
+        _rigidbody.MovePosition(nextPos);
+
+        if (_direction != Vector3.zero)
         {
-            Vector3 toSheep = (nearest.transform.position - transform.position).normalized;
-            toSheep.y = 0;
-            _direction = toSheep;
+            Quaternion targetRotation = Quaternion.LookRotation(_direction);
+            _rigidbody.MoveRotation(targetRotation);
         }
     }
 
     private void AvoidZone()
     {
-        // Check if Zone is ahead
-        // Layer: Zone
-        int zoneLayer = LayerMask.GetMask("Zone");
-        // Or string
-        // Raycast
         if (Physics.Raycast(transform.position, _direction, out RaycastHit hit, 5f, 1 << LayerMask.NameToLayer("Zone")))
         {
-            // Tangent: Rotate 90 degrees?
-            // Or use normal from hit? Sphere tangent.
             Vector3 normal = hit.normal;
-            // Cross with Up to get tangent
             Vector3 tangent = Vector3.Cross(normal, Vector3.up).normalized;
 
-            // Choose tangent closer to current direction?
             if (Vector3.Dot(tangent, _direction) < 0)
             {
                 tangent = -tangent;
             }
 
-            _direction = Vector3.Lerp(_direction, tangent, Time.deltaTime * 10f); // Smooth turn
+            _direction = Vector3.Lerp(_direction, tangent, Time.fixedDeltaTime * 10f);
         }
     }
 
@@ -107,9 +75,17 @@ public class WolfController : MonoBehaviour, IAgent
             Destroy(collision.gameObject);
             GameManager.Instance.AddDeathCount();
         }
+        else if (collision.gameObject.CompareTag("Wall"))
+        {
+            if (collision.contacts.Length > 0)
+            {
+                Vector3 normal = collision.contacts[0].normal;
+                _direction = Vector3.Reflect(_direction, normal).normalized;
+                _direction.y = 0;
+            }
+        }
     }
 
-    // IAgent Implementation
     public void OnDirectClick()
     {
         Vector2 rnd = Random.insideUnitCircle;
