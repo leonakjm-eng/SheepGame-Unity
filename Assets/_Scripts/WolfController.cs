@@ -21,6 +21,7 @@ public class WolfController : MonoBehaviour, IAgent
 
         _animator = GetComponentInChildren<Animator>();
         _rigidbody = GetComponent<Rigidbody>();
+        if (_rigidbody != null) _rigidbody.collisionDetectionMode = CollisionDetectionMode.Continuous;
     }
 
     private void Update()
@@ -82,12 +83,8 @@ public class WolfController : MonoBehaviour, IAgent
         }
         else if (collision.gameObject.CompareTag("Wall"))
         {
-            if (collision.contacts.Length > 0)
-            {
-                Vector3 normal = collision.contacts[0].normal;
-                _direction = Vector3.Reflect(_direction, normal).normalized;
-                _direction.y = 0;
-            }
+            Vector2 rnd = Random.insideUnitCircle;
+            _direction = new Vector3(rnd.x, 0, rnd.y).normalized;
         }
     }
 
