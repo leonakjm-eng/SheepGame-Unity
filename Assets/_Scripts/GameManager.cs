@@ -120,20 +120,16 @@ public class GameManager : MonoBehaviour
         float x = Random.Range(_mapMin.x + padding, _mapMax.x - padding);
         float z = Random.Range(_mapMin.y + padding, _mapMax.y - padding);
 
-        // Constraint: Y = 0.5f
-        GameObject zone = Instantiate(targetZonePrefab, new Vector3(x, 0.5f, z), Quaternion.identity);
+        // Constraint: Y = 0.01f
+        GameObject zone = Instantiate(targetZonePrefab, new Vector3(x, 0.01f, z), Quaternion.identity);
 
-        // Constraint: Scale based on level, max 3x initial.
-        // Initial scale assumed to be Vector3.one * 2f from previous iteration requirement (Scale * 2).
-        // Let's base it on current level.
-        // Level 1: Scale 2. Level Max: Scale 6.
-        // Formula: 2 + (Level * 0.5)? or just clamp.
-        // FDS says: "Increase with level, Max 3x initial".
-        // Let's assume initial is 2. So max 6.
+        // Constraint: Scale increases with level (clamped to 3x). Y fixed at 0.05f.
+        // Base scale assumed X/Z = 2.
+        float baseScaleXZ = 2f;
         float scaleFactor = Mathf.Min(1f + (currentLevel - 1) * 0.2f, 3f);
-        // Example: Lvl 1: 1.0. Lvl 11: 3.0.
+        float targetScaleXZ = baseScaleXZ * scaleFactor;
 
-        zone.transform.localScale = (Vector3.one * 2f) * scaleFactor;
+        zone.transform.localScale = new Vector3(targetScaleXZ, 0.05f, targetScaleXZ);
     }
 
     private void SpawnEntity(GameObject prefab)
@@ -144,6 +140,9 @@ public class GameManager : MonoBehaviour
         float checkRadius = 1.0f; // Adjust based on agent size
         bool validPos = false;
 
+        // Constraint: Check against Agent AND Zone layer
+        int combinedLayerMask = agentLayer | (1 << LayerMask.NameToLayer("Zone"));
+
         // Constraint: Safe spawn logic with max attempts
         for (int i = 0; i < maxAttempts; i++)
         {
@@ -151,7 +150,7 @@ public class GameManager : MonoBehaviour
             float z = Random.Range(_mapMin.y + padding, _mapMax.y - padding);
             spawnPos = new Vector3(x, 0, z); // Agents usually on Y=0 or adjusted by physics
 
-            if (!Physics.CheckSphere(spawnPos, checkRadius, agentLayer))
+            if (!Physics.CheckSphere(spawnPos, checkRadius, combinedLayerMask))
             {
                 validPos = true;
                 break; // Found valid spot
@@ -164,9 +163,7 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            // Fallback: Just spawn somewhere or log warning?
-            // FDS implies "Must implement limit", doesn't specify fallback.
-            // Spawning at last checked pos is better than nothing.
+            // Fallback: Just spawn somewhere if we can't find a spot
             Instantiate(prefab, spawnPos, Quaternion.identity);
         }
     }

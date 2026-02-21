@@ -64,7 +64,7 @@ public class WolfController : MonoBehaviour, IAgent
                 tangent = -tangent;
             }
 
-            _direction = Vector3.Lerp(_direction, tangent, Time.fixedDeltaTime * 10f);
+            _direction = Vector3.Lerp(_direction, tangent, Time.fixedDeltaTime * 10f).normalized;
         }
     }
 
