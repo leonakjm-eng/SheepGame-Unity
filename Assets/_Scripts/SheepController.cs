@@ -14,6 +14,7 @@ public class SheepController : MonoBehaviour, IAgent
     private Transform _targetZoneTransform;
     private float _targetZoneRadius;
     private Animator _animator;
+    private Rigidbody _rigidbody;
 
     public bool IsSafe => _isSafe;
 
@@ -23,36 +24,41 @@ public class SheepController : MonoBehaviour, IAgent
         Vector2 rnd = Random.insideUnitCircle;
         _direction = new Vector3(rnd.x, 0, rnd.y).normalized;
 
-        // Requirement 3: Cache Animator
         _animator = GetComponentInChildren<Animator>();
+        _rigidbody = GetComponent<Rigidbody>();
     }
 
     private void Update()
     {
-        if (_isSafe && _targetZoneTransform != null)
-        {
-            // Clamp within zone
-            float dist = Vector3.Distance(transform.position, _targetZoneTransform.position);
-            if (dist > _targetZoneRadius)
-            {
-                Vector3 toCenter = (_targetZoneTransform.position - transform.position).normalized;
-                _direction = Vector3.Lerp(_direction, toCenter, Time.deltaTime * 5f);
-            }
-        }
-
-        transform.Translate(_direction * _currentSpeed * Time.deltaTime, Space.World);
-
-        if (_direction != Vector3.zero)
-        {
-            transform.rotation = Quaternion.LookRotation(_direction);
-        }
-
-        // Requirement 3: Update Animation
+        // Constraint: Update animation based on speed
         if (_animator != null)
         {
             _animator.SetFloat("Vert", _currentSpeed);
-            // Assuming State 1 is Move, 0 is Idle.
             _animator.SetInteger("State", _currentSpeed > 0.1f ? 1 : 0);
+        }
+    }
+
+    private void FixedUpdate()
+    {
+        if (_rigidbody == null) return;
+
+        if (_isSafe && _targetZoneTransform != null)
+        {
+            float dist = Vector3.Distance(_rigidbody.position, _targetZoneTransform.position);
+            if (dist > _targetZoneRadius)
+            {
+                Vector3 toCenter = (_targetZoneTransform.position - _rigidbody.position).normalized;
+                _direction = Vector3.Lerp(_direction, toCenter, Time.fixedDeltaTime * 5f);
+            }
+        }
+
+        Vector3 nextPos = _rigidbody.position + (_direction * _currentSpeed * Time.fixedDeltaTime);
+        _rigidbody.MovePosition(nextPos);
+
+        if (_direction != Vector3.zero)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(_direction);
+            _rigidbody.MoveRotation(targetRotation);
         }
     }
 
@@ -71,7 +77,6 @@ public class SheepController : MonoBehaviour, IAgent
 
     private void OnTriggerEnter(Collider other)
     {
-        // Detect Zone Layer
         if (other.gameObject.layer == LayerMask.NameToLayer("Zone"))
         {
             _isSafe = true;
@@ -84,15 +89,11 @@ public class SheepController : MonoBehaviour, IAgent
         }
     }
 
-    // Called by TargetZone.cs
     public void SetSafeState(bool safe)
     {
         _isSafe = safe;
-        // Note: transform/radius might not be set yet if OnTriggerEnter hasn't fired.
-        // But OnTriggerEnter will fire if physics is working.
     }
 
-    // IAgent Implementation
     public void OnDirectClick()
     {
         Vector2 rnd = Random.insideUnitCircle;
@@ -110,8 +111,7 @@ public class SheepController : MonoBehaviour, IAgent
 
     private IEnumerator PanicRoutine()
     {
-        // FDS: Panic (1s) Speed 2x. End -> Return to normal.
-        if (_isPanic) yield break; // Or reset? FDS implies state.
+        if (_isPanic) yield break;
 
         _isPanic = true;
         _currentSpeed = moveSpeed * 2f;

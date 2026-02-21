@@ -61,44 +61,25 @@ public class GameManager : MonoBehaviour
         Debug.Log($"Map Bounds: {_mapMin} to {_mapMax}");
     }
 
-    private void AdjustWalls()
-    {
-        if (wallsRoot == null) return;
-
-        // Assuming 4 children: Top, Bottom, Left, Right
-        // Or specific names. Let's just fit them to bounds.
-        // Needs Cube Colliders.
-        // Top Wall
-        Transform top = wallsRoot.GetChild(0);
-        top.position = new Vector3((_mapMin.x + _mapMax.x)/2, 0, _mapMax.y);
-        top.localScale = new Vector3(_mapMax.x - _mapMin.x, 5, 1);
-
-        // Bottom Wall
-        Transform bottom = wallsRoot.GetChild(1);
-        bottom.position = new Vector3((_mapMin.x + _mapMax.x)/2, 0, _mapMin.y);
-        bottom.localScale = new Vector3(_mapMax.x - _mapMin.x, 5, 1);
-
-        // Left Wall
-        Transform left = wallsRoot.GetChild(2);
-        left.position = new Vector3(_mapMin.x, 0, (_mapMin.y + _mapMax.y)/2);
-        left.localScale = new Vector3(1, 5, _mapMax.y - _mapMin.y);
-
-        // Right Wall
-        Transform right = wallsRoot.GetChild(3);
-        right.position = new Vector3(_mapMax.x, 0, (_mapMin.y + _mapMax.y)/2);
-        right.localScale = new Vector3(1, 5, _mapMax.y - _mapMin.y);
-    }
-
     public void StartLevel()
     {
         _liveCount = 0;
-        _deathCount = 0;
-        _targetCount = Mathf.Max(1, (int)(startSheepCount * 0.8f)); // Target logic? FDS doesn't say. 80% survival?
-        // Or "TargetCount calculation". Maybe fixed per level?
-        // Let's say Target = SheepCount - 1.
-        // Assume SheepCount = Level + 2.
-        int sheepToSpawn = startSheepCount + (currentLevel - 1);
-        _targetCount = sheepToSpawn - 1;
+        _deathCount = 0; // Constraint: Reset death count
+
+        // Constraint: Sheep Count Formula
+        // Level 1: 2. Level N: 2 + (N-1). Max 10.
+        int totalSheep = Mathf.Min(2 + (currentLevel - 1), 10);
+
+        // Constraint: Target Count Formula (Floor(Total * 0.7))
+        _targetCount = Mathf.FloorToInt(totalSheep * 0.7f);
+
+        // Constraint: Wolf Count Formula
+        // Level 1-4: 0. Level 5+: 1 + (N-5). Max 5.
+        int wolfCount = 0;
+        if (currentLevel >= 5)
+        {
+            wolfCount = Mathf.Min(1 + (currentLevel - 5), 5);
+        }
 
         _isGameActive = true;
         Time.timeScale = 1;
@@ -108,20 +89,16 @@ public class GameManager : MonoBehaviour
         foreach (var agent in FindObjectsOfType<WolfController>()) Destroy(agent.gameObject);
         foreach (var zone in FindObjectsOfType<TargetZone>()) Destroy(zone.gameObject);
 
-        // Adjust Walls
-        AdjustWalls();
-
         // Spawn Zone
         SpawnTargetZone();
 
         // Spawn Sheep
-        for (int i = 0; i < sheepToSpawn; i++)
+        for (int i = 0; i < totalSheep; i++)
         {
             SpawnEntity(sheepPrefab);
         }
 
         // Spawn Wolf
-        int wolfCount = startWolfCount + (currentLevel / 5);
         for (int i = 0; i < wolfCount; i++)
         {
             SpawnEntity(wolfPrefab);
@@ -131,8 +108,6 @@ public class GameManager : MonoBehaviour
         if (uiManager != null)
         {
             uiManager.UpdateHUD(currentLevel, _targetCount, _liveCount, _deathCount);
-            // Hide Win/Lose panels? Handled by UIManager Start or Reset.
-            // But we should ensure they are closed here.
             uiManager.panelGameWin.SetActive(false);
             uiManager.panelGameLose.SetActive(false);
         }
@@ -141,14 +116,24 @@ public class GameManager : MonoBehaviour
     private void SpawnTargetZone()
     {
         // Random position within bounds, padded by radius
-        // Assume radius 2?
         float padding = 3f;
         float x = Random.Range(_mapMin.x + padding, _mapMax.x - padding);
         float z = Random.Range(_mapMin.y + padding, _mapMax.y - padding);
 
-        // Requirement 1: Y = 0.5f, Scale * 2
+        // Constraint: Y = 0.5f
         GameObject zone = Instantiate(targetZonePrefab, new Vector3(x, 0.5f, z), Quaternion.identity);
-        zone.transform.localScale = Vector3.one * 2f;
+
+        // Constraint: Scale based on level, max 3x initial.
+        // Initial scale assumed to be Vector3.one * 2f from previous iteration requirement (Scale * 2).
+        // Let's base it on current level.
+        // Level 1: Scale 2. Level Max: Scale 6.
+        // Formula: 2 + (Level * 0.5)? or just clamp.
+        // FDS says: "Increase with level, Max 3x initial".
+        // Let's assume initial is 2. So max 6.
+        float scaleFactor = Mathf.Min(1f + (currentLevel - 1) * 0.2f, 3f);
+        // Example: Lvl 1: 1.0. Lvl 11: 3.0.
+
+        zone.transform.localScale = (Vector3.one * 2f) * scaleFactor;
     }
 
     private void SpawnEntity(GameObject prefab)
@@ -157,21 +142,33 @@ public class GameManager : MonoBehaviour
         Vector3 spawnPos = Vector3.zero;
         int maxAttempts = 30;
         float checkRadius = 1.0f; // Adjust based on agent size
+        bool validPos = false;
 
-        // Requirement 2: Safe spawn logic with max attempts
+        // Constraint: Safe spawn logic with max attempts
         for (int i = 0; i < maxAttempts; i++)
         {
             float x = Random.Range(_mapMin.x + padding, _mapMax.x - padding);
             float z = Random.Range(_mapMin.y + padding, _mapMax.y - padding);
-            spawnPos = new Vector3(x, 0, z);
+            spawnPos = new Vector3(x, 0, z); // Agents usually on Y=0 or adjusted by physics
 
             if (!Physics.CheckSphere(spawnPos, checkRadius, agentLayer))
             {
+                validPos = true;
                 break; // Found valid spot
             }
         }
 
-        Instantiate(prefab, spawnPos, Quaternion.identity);
+        if (validPos)
+        {
+            Instantiate(prefab, spawnPos, Quaternion.identity);
+        }
+        else
+        {
+            // Fallback: Just spawn somewhere or log warning?
+            // FDS implies "Must implement limit", doesn't specify fallback.
+            // Spawning at last checked pos is better than nothing.
+            Instantiate(prefab, spawnPos, Quaternion.identity);
+        }
     }
 
     private void Update()
