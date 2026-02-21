@@ -89,16 +89,15 @@ public class GameManager : MonoBehaviour
         foreach (var agent in FindObjectsOfType<WolfController>()) Destroy(agent.gameObject);
         foreach (var zone in FindObjectsOfType<TargetZone>()) Destroy(zone.gameObject);
 
-        // Spawn Zone
+        // Step 1: TargetZone (Must be spawned first for safe agent placement)
         SpawnTargetZone();
 
-        // Spawn Sheep
+        // Step 2: Agents (Sheep & Wolf) Safe Spawn
         for (int i = 0; i < totalSheep; i++)
         {
             SpawnEntity(sheepPrefab);
         }
 
-        // Spawn Wolf
         for (int i = 0; i < wolfCount; i++)
         {
             SpawnEntity(wolfPrefab);
@@ -115,20 +114,32 @@ public class GameManager : MonoBehaviour
 
     private void SpawnTargetZone()
     {
-        // Random position within bounds, padded by radius
-        float padding = 3f;
-        float x = Random.Range(_mapMin.x + padding, _mapMax.x - padding);
-        float z = Random.Range(_mapMin.y + padding, _mapMax.y - padding);
-
-        // Constraint: Y = 0.01f
-        GameObject zone = Instantiate(targetZonePrefab, new Vector3(x, 0.01f, z), Quaternion.identity);
-
-        // Constraint: Scale increases with level (clamped to 3x). Y fixed at 0.05f.
-        // Base scale assumed X/Z = 2.
+        // 1. Random Scale Logic: 1x to 3x of Base Scale (2.0f)
         float baseScaleXZ = 2f;
-        float scaleFactor = Mathf.Min(1f + (currentLevel - 1) * 0.2f, 3f);
-        float targetScaleXZ = baseScaleXZ * scaleFactor;
+        float randomScaleMultiplier = Random.Range(1f, 3f);
+        float targetScaleXZ = baseScaleXZ * randomScaleMultiplier;
 
+        // 2. Position Calculation with Radius Padding
+        // Radius = 0.5f * Scale (Assuming Unit Sphere Prefab)
+        float radius = 0.5f * targetScaleXZ;
+
+        // Calculate valid range within MapBounds
+        float xMin = _mapMin.x + radius;
+        float xMax = _mapMax.x - radius;
+        float zMin = _mapMin.y + radius;
+        float zMax = _mapMax.y - radius;
+
+        // Clamp in case bounds are smaller than diameter (unlikely but safe)
+        if (xMin > xMax) xMin = xMax = (xMin + xMax) * 0.5f;
+        if (zMin > zMax) zMin = zMax = (zMin + zMax) * 0.5f;
+
+        float x = Random.Range(xMin, xMax);
+        float z = Random.Range(zMin, zMax);
+
+        Vector3 spawnPos = new Vector3(x, 0.01f, z);
+
+        // 3. Instantiate
+        GameObject zone = Instantiate(targetZonePrefab, spawnPos, Quaternion.identity);
         zone.transform.localScale = new Vector3(targetScaleXZ, 0.05f, targetScaleXZ);
     }
 
